@@ -76,27 +76,27 @@ def pollard_rho(g, p, q, y):
 
     i = 0
     #Slow "Tortoise"
-    T, a, b = (1, 0, 0)
+    T, alpha, beta = (1, 0, 0)
     #Fast "Hare"
-    H, g, d = (1, 0, 0)
+    H, gamma, delta = (1, 0, 0)
 
     while True:
         i += 1
 
-        T, a, b = f_mapping(T, a, b)
-        H, g, d = f_mapping(*f_mapping(H, g, d))
+        T, alpha, beta = f_mapping(T, alpha, beta)
+        H, gamma, delta = f_mapping(*f_mapping(H, gamma, delta))
 
         if (T == H % p): 
             #Now T = H, so a + xb = g + xd mod p_t
-            if  b != d % q:
-                x = (a-g)*pow(d - b, -1, q) % q
+            if  beta != delta % q:
+                x = (alpha-gamma)*pow(delta - beta, -1, q) % q
                 return (x, i)
             else:
-                a = randrange(0, q)
-                b = randrange(0, q)
-                T = (pow(g, a, p) * pow(y, b, p)) % p
-                H, g, d = (T, a, b)
-                print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {a}, beta = {b}, T = {T}")
+                alpha = randrange(0, q)
+                beta = randrange(0, q)
+                T = (pow(g, alpha, p) * pow(y, beta, p)) % p
+                H, gamma, delta = (T, alpha, beta)
+                print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {alpha}, beta = {beta}, T = {T}")
 
 """
 Genearate an instance of an DL problem
