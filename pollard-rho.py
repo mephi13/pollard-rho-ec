@@ -52,41 +52,40 @@ def gen_y(g_t, p_t, p, real_x = None):
     return (x, y)
 
 """
-Calculate next parameters Xi+1, ai+1 and bi+1 based on the mapping function fi(Xi, ai, bi) -> (Xi+1, ai+1, bi+1)
-"""
-def f_mapping(Xi, ai, bi, g_t, p, y, p_t):
-    case = Xi % 3
-
-    #Xi belongs to S0
-    if case == 1: 
-        Xj = g_t * Xi % p
-        aj = ai + 1 % p_t
-        bj = bi 
-    #Xi belongs to S1
-    elif case == 2:
-        Xj = pow(Xi, 2, p)
-        aj = 2*ai % p_t
-        bj = 2*bi % p_t
-    #Xi belongs to S2
-    else:
-        Xj = Xi *y % p
-        aj = ai
-        bj = bi + 1 % p_t
-    return (Xj, aj, bj)
-
-"""
 Pollard-rho alghorhitm for DL problems
 """
 def pollard_rho(g_t, p, p_t, y):
+    def f_mapping(Xi, ai, bi):
+        case = Xi % 3
+        #Xi belongs to S0
+        if case == 1: 
+            Xj = (g_t * Xi) % p
+            aj = (ai + 1) % p_t
+            bj = bi 
+        #Xi belongs to S1
+        elif case == 2:
+            Xj = pow(Xi, 2, p)
+            aj = (2*ai) % p_t
+            bj = (2*bi) % p_t
+        #Xi belongs to S2
+        else:
+            Xj = (Xi *y) % p
+            aj = ai
+            bj = (bi + 1) % p_t
+        return (Xj, aj, bj)
+
     i = 0
     #Slow "Tortoise"
     T, a, b = (1, 0, 0)
     #Fast "Hare"
     H, g, d = (1, 0, 0)
+
     while True:
         i += 1
-        T, a, b = f_mapping(T, a, b, g_t, p, y, p_t)
-        H, g, d = f_mapping(*f_mapping(H, g, d, g_t, p, y, p_t), g_t, p, y, p_t)
+
+        T, a, b = f_mapping(T, a, b)
+        H, g, d = f_mapping(*f_mapping(H, g, d))
+
         if (T == H % p): 
             #Now T = H, so a + xb = g + xd mod p_t
             if  b != d % p_t:
@@ -96,6 +95,7 @@ def pollard_rho(g_t, p, p_t, y):
                 a = randrange(0, p_t)
                 b = randrange(0, p_t)
                 T = (pow(g_t, a, p) * pow(y, b, p)) % p
+                H, g, d = (T, a, b)
                 print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {a}, beta = {b}, T = {T}")
 
 """
@@ -106,6 +106,7 @@ def generate_DLP_instance(min_p, max_p, p, p_t, g, g_t , real_x, y):
         if not (p and p_t):
             p, p_t = gen_strong_prime(min_p, max_p, True, p, p_t)
         assert (isprime(p) and isprime(p_t) and p == 2*p_t + 1), "p or p_t are not primes or p != 2*p_t +1, use different values"
+        assert (p_t != 2), "p_t can't be equal to 2, use a different value"
 
         if not (g_t):
             g, g_t = gen_g(p, g=g)
