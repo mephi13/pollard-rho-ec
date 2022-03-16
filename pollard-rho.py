@@ -54,24 +54,24 @@ def gen_y(g_t, p_t, p, real_x = None):
 """
 Pollard-rho alghorhitm for DL problems
 """
-def pollard_rho(g_t, p, p_t, y):
+def pollard_rho(g, p, q, y):
     def f_mapping(Xi, ai, bi):
         case = Xi % 3
         #Xi belongs to S0
         if case == 1: 
-            Xj = (g_t * Xi) % p
-            aj = (ai + 1) % p_t
+            Xj = (g * Xi) % p
+            aj = (ai + 1) % q
             bj = bi 
         #Xi belongs to S1
         elif case == 2:
             Xj = pow(Xi, 2, p)
-            aj = (2*ai) % p_t
-            bj = (2*bi) % p_t
+            aj = (2*ai) % q
+            bj = (2*bi) % q
         #Xi belongs to S2
         else:
             Xj = (Xi *y) % p
             aj = ai
-            bj = (bi + 1) % p_t
+            bj = (bi + 1) % q
         return (Xj, aj, bj)
 
     i = 0
@@ -88,13 +88,13 @@ def pollard_rho(g_t, p, p_t, y):
 
         if (T == H % p): 
             #Now T = H, so a + xb = g + xd mod p_t
-            if  b != d % p_t:
-                x = (a-g)*pow(d - b, -1, p_t) % p_t
+            if  b != d % q:
+                x = (a-g)*pow(d - b, -1, q) % q
                 return (x, i)
             else:
-                a = randrange(0, p_t)
-                b = randrange(0, p_t)
-                T = (pow(g_t, a, p) * pow(y, b, p)) % p
+                a = randrange(0, q)
+                b = randrange(0, q)
+                T = (pow(g, a, p) * pow(y, b, p)) % p
                 H, g, d = (T, a, b)
                 print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {a}, beta = {b}, T = {T}")
 
