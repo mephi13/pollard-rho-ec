@@ -38,7 +38,7 @@ def gen_g(p, g = None):
         g = 0
         g_t = 1
         while g_t == 1:
-            g = randrange(1, p)
+            g = randrange(2, p)
             g_t = pow(g,2,p) 
     return (g, g_t)
 
@@ -101,17 +101,20 @@ def pollard_rho(g, p, q, y):
 """
 Genearate an instance of an DL problem
 """
-def generate_DLP_instance(min_p, max_p, p, p_t, g, g_t , real_x, y):
+def generate_DLP_instance(min_p, max_p, p, p_t, g, g_t , real_x, y, r):
     try:
+        #Generate primes p and p_t
         if not (p and p_t):
-            p, p_t = gen_strong_prime(min_p, max_p, True, p, p_t)
-        assert (isprime(p) and isprime(p_t) and p == 2*p_t + 1), "p or p_t are not primes or p != 2*p_t +1, use different values"
-        assert (p_t != 2), "p_t can't be equal to 2, use a different value"
+            p, p_t = gen_strong_prime(min_p, max_p, not r, p, p_t)
+        assert (isprime(p) and isprime(p_t) and p == 2*p_t + 1), "p or p_t are not primes or p != 2*p_t + 1, use different values"
+        assert (p_t >= 2), "p_t ust be greater than 2, use a different value"
 
+        #Generate g and g_t
         if not (g_t):
             g, g_t = gen_g(p, g=g)
         assert (pow(g_t, p_t, p) == 1), "Order of g_t should be equal to p_t, use different value"
 
+        #Generate y
         if not (y):
             real_x, y = gen_y(g_t, p_t, p, real_x)
         elif real_x:
@@ -122,13 +125,13 @@ def generate_DLP_instance(min_p, max_p, p, p_t, g, g_t , real_x, y):
     except AssertionError as ex:
         raise Exception(f"Generating DLP failed, reason: \n{ex.args[0]}")
 
-def main(min = None, max = None, p= None, p_t = None, g = None, g_t = None, real_x = None, y = None):
+def main(min = None, max = None, p= None, p_t = None, g = None, g_t = None, real_x = None, y = None, r= None):
     try:
         nmin = 40 if not min else min
         max = 61 if not (max or min) else min + 1 if max==None else max + 1
         min = nmin
 
-        p, p_t, g, g_t, real_x, y = generate_DLP_instance(min, max, p, p_t, g, g_t, real_x, y)
+        p, p_t, g, g_t, real_x, y = generate_DLP_instance(min, max, p, p_t, g, g_t, real_x, y, r)
 
         print(f'p is a {p.bit_length()} bit number')
         print("p = %s, p_t = %s" % (p, p_t))
@@ -162,6 +165,8 @@ if __name__=="__main__":
     parser.add_argument("-gt", type=int)
     parser.add_argument("-x", type=int)
     parser.add_argument("-y", type=int)
+    parser.add_argument("-r", action='store', nargs='*')
     a = parser.parse_args()
+    r = True if a.r is not None else False
 
-    main(a.min, a.max, a.p, a.pt, a.g, a.gt, a.x, a.y)
+    main(a.min, a.max, a.p, a.pt, a.g, a.gt, a.x, a.y, r)
