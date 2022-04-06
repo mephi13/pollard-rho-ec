@@ -4,6 +4,7 @@ from sympy import randprime, isprime, nextprime
 from ec_gen import point_double, point_add, EC
 #misc
 import argparse
+from termcolor import colored
 from random import randrange
 import time
 
@@ -65,7 +66,7 @@ def pollard_rho(Y, P, q, p, a, b):
         if (T == H): 
             #Now T = H, so aP + bQ = gP + dQ = -(a-g)/(d-b)P = Q
             if  beta != delta % q:
-                print(alpha, gamma, delta, beta)
+                #print(alpha, gamma, delta, beta)
                 s = (alpha-gamma)*pow(delta - beta, -1, q) % q
                 return (s, i)
             else:
@@ -103,7 +104,10 @@ def main(n_bits = None, real_s = None, Y = None):
 
         print(f'p is a {ec.field_size.bit_length()} bit number')
         print(f'EC: {str(ec)}')
-        print(f"Real s = {real_s}, \nY = {ec.basepoint}*{real_s} mod {ec.field_size} = {Y}") if real_s else print(f"Y = {ec.basepoint}*s mod {ec.field_size} = {Y}")
+        print(f"Real s = {colored(real_s, 'magenta')},") 
+        print(f"Y = {colored(ec.basepoint, 'green')} * {colored(real_s, 'magenta')}"\
+            " mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")\
+            if real_s else print(f"Y = {colored(ec.basepoint, 'green')}*s mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
         print(f'Estimated maximum iterations order of magnitude sqrt(q) = {round(pow(ec.order, 0.5)):,}')
 
         #Pollard-rho calculations + time checking
@@ -111,15 +115,15 @@ def main(n_bits = None, real_s = None, Y = None):
         calc_s, i = pollard_rho(Y, ec.basepoint, ec.order, ec.field_size, ec.a, ec.b)
         calc_time = time.time() - start_time
         
-        print(f'Calcutaion time: {round(calc_time, 1)} seconds')
+        print(f'Calculation time: {round(calc_time, 1)} seconds')
         print(f"Iterations: {i:,}")
-        print(f"Real s = {real_s}, calculated s = {calc_s}") if real_s else print(f"Calculated s = {calc_s}")
+        print(f"Real s = {colored(real_s, 'magenta')}, calculated s = {colored(calc_s, 'red')}") if real_s else print(f"Calculated s = {colored(calc_s, 'red')}")
     
         #Check if real s and calc s are the same
         if fast_multiply(ec.basepoint, calc_s, ec.a, ec.field_size) == Y:
-            print(f"Calculations correct, {ec.basepoint}*{calc_s} mod {ec.field_size} = {Y}")
+            print(f"Calculations correct, {colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
         else:
-            print(f"Calculations failed,  {ec.basepoint}*{calc_s} mod {ec.field_size} = {Y}")
+            print(f"Calculations failed,  {colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
     except Exception as ex:
         print(ex.args[0])
 
