@@ -1,7 +1,7 @@
 #!/bin/python
 #for prime generation
 from sympy import randprime, isprime, nextprime
-from ec_gen import point_double, point_add, EC
+from ec_gen import point_double, point_add, EC, EcPoint
 #misc
 import argparse
 from termcolor import colored
@@ -32,7 +32,7 @@ Pollard-rho algorithm for DL problems
 """
 def pollard_rho(Y, P, q, p, a, b):
     def f_mapping(Xi, ai, bi):
-        case = Xi[0] % 3
+        case = Xi.x % 3
         #Xi belongs to S0
         if case == 1: 
             Xj = point_add(Xi, P, a, p)
@@ -96,6 +96,7 @@ def generate_DLP_instance(n_bits, real_s, Y):
     except Exception as ex:
         raise Exception(f"Generating DLP failed, reason: \n{ex.args[0]}")
 
+
 def main(n_bits = None, real_s = None, Y = None):
     try:
         #init params
@@ -113,7 +114,7 @@ def main(n_bits = None, real_s = None, Y = None):
 
         #Pollard-rho calculations + time checking
         print(f"Starting pollard-rho(Y, P, q, p, a, b) = ")
-        print(f"Pollard-Rho({colored(Y, 'blue')}, {colored(ec.basepoint, 'green')}, {colored(ec.order, 'cyan')}, {colored(ec.field_size, 'yellow')}, {colored(ec.a, 'grey')}, {colored(ec.b, 'grey')})")
+        print(f"Pollard-Rho({colored(Y, 'blue')}, {colored(ec.basepoint, 'green')}, {colored(ec.order, 'cyan')}, {colored(ec.field_size, 'yellow')}, {colored(ec.a, 'white')}, {colored(ec.b, 'white')})")
         start_time = time.time()
         calc_s, i = pollard_rho(Y, ec.basepoint, ec.order, ec.field_size, ec.a, ec.b)
         calc_time = time.time() - start_time
@@ -124,9 +125,11 @@ def main(n_bits = None, real_s = None, Y = None):
 
         #Check if real s and calc s are the same
         if fast_multiply(ec.basepoint, calc_s, ec.a, ec.field_size) == Y:
-            print(f"Calculations correct, {colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
+            print(f"{colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
+            print(f"{colored('Calculations correct!', 'green')}")
         else:
-            print(f"Calculations failed,  {colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
+            print(f"{colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
+            print(f"{colored('Calculations failed!', 'red')}")
     except Exception as ex:
         print(ex.args[0])
 
@@ -137,7 +140,8 @@ if __name__=="__main__":
     parser.add_argument("-s", type=int)
     a = parser.parse_args()
     if a.y != None:
-        y = tuple(a.y)
+        assert len(a.y) == 2, "Supply exactly 2 coordinates for Y"
+        y = EcPoint(a.y[0], a.y[1])
     else:
         y = a.y
 
