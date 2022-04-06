@@ -110,17 +110,18 @@ def main(n_bits = None, real_s = None, Y = None):
             if real_s else print(f"Y = {colored(ec.basepoint, 'green')}*s mod {colored(ec.field_size, 'yellow')}\nY = {colored(Y, 'blue')}")
         print(f'Estimated maximum iterations order of magnitude sqrt(q) = {round(pow(ec.order, 0.5)):,}')
 
+
         #Pollard-rho calculations + time checking
         print(f"Starting pollard-rho(Y, P, q, p, a, b) = ")
         print(f"Pollard-Rho({colored(Y, 'blue')}, {colored(ec.basepoint, 'green')}, {colored(ec.order, 'cyan')}, {colored(ec.field_size, 'yellow')}, {colored(ec.a, 'grey')}, {colored(ec.b, 'grey')})")
         start_time = time.time()
         calc_s, i = pollard_rho(Y, ec.basepoint, ec.order, ec.field_size, ec.a, ec.b)
         calc_time = time.time() - start_time
-        
         print(f'Calculation time: {round(calc_time, 1)} seconds')
         print(f"Iterations: {i:,}")
         print(f"Real s = {colored(real_s, 'magenta')}, calculated s = {colored(calc_s, 'red')}") if real_s else print(f"Calculated s = {colored(calc_s, 'red')}")
     
+
         #Check if real s and calc s are the same
         if fast_multiply(ec.basepoint, calc_s, ec.a, ec.field_size) == Y:
             print(f"Calculations correct, {colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
