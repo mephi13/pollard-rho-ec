@@ -21,7 +21,7 @@ class EcPoint:
         return f'({self.x}, {self.y})'
 
     def __neg__(self):
-        return (self.x, -self.y, self.inf)
+        return EcPoint(self.x, -self.y, False) if not self.inf else self
 
 
 EC = {
@@ -88,3 +88,5 @@ if __name__ == "__main__":
     ec = EC[40]
 
     print("Eliptic curve: " + str(ec))
+    print(ec.basepoint, -ec.basepoint)
+    print(EcPoint(0, 123, True), -EcPoint(0, 1230, True))
