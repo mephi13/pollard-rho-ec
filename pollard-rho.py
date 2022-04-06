@@ -1,84 +1,59 @@
-#!/home/mephi/.virtualenvs/pollard/bin/python
+#!/bin/python
 #for prime generation
 from sympy import randprime, isprime, nextprime
+from ec_gen import point_double, point_add, EC
 #misc
 import argparse
 from random import randrange
 import time
 
 
-"""   
-Generate a strong prime p between min and max, such that p = 2p_t + 2 where p, p_t are prime
 """
-def gen_strong_prime(min, max, randomize_bin_len = False, p =None, p_t = None):
-    if p:
-        p_t = (p - 1) // 2
-    elif p_t:
-        p =  2*p_t + 1
-    else:
-        p = 0
-        min_v = min - 2
-        max_v = max - 2
-        while not isprime(p):
-            if randomize_bin_len:
-                min_v = randrange(min - 2,max - 2)
-                max_v = min_v + 1
-            p_t = randprime(2 ** min_v, 2 ** max_v)
-            p = 2*p_t + 1
-    #print(f"Bit length: {p.bit_length()}")
-    return (p, p_t)
+double-and-add algorithm for fast multiplication
+"""
+def fast_multiply(P: tuple, s: int, a: int, p: int) -> tuple:
+    b_bin = format(s, "b")
+    
+    R = P
+    for bit in b_bin[1:]:
+        R = point_double(R, a, p)
+        if bit == "1":
+            R = point_add(R, P, a, p)
+    return R
 
-"""   
-Generate base of the DL g_t and g. Order of g_t must be equal to p_t
-"""
-def gen_g(p, g = None):
-    if g != None:
-        g_t = pow(g, 2, p) 
-    else:
-        g = 0
-        g_t = 1
-        while g_t == 1:
-            g = randrange(2, p)
-            g_t = pow(g,2,p) 
-    return (g, g_t)
+def gen_Y_ec(P, q, a, p, real_x = None):
+    s = randrange(2, q - 1) if not real_x else real_x
+    Y = fast_multiply(P, s, a, p)
+    return (s, Y)
 
 """
-generate y in <g> such that y = g^x mod p
-x will be then calculated using pollard rho alghorhitm 
+Pollard-rho algorithm for DL problems
 """
-def gen_y(g_t, p_t, p, real_x = None):
-    x = randrange(0, p_t) if not real_x else real_x
-    y = pow(g_t, x, p)
-    return (x, y)
-
-"""
-Pollard-rho alghorhitm for DL problems
-"""
-def pollard_rho(g, p, q, y):
+def pollard_rho(Y, P, q, p, a, b):
     def f_mapping(Xi, ai, bi):
-        case = Xi % 3
+        case = Xi[0] % 3
         #Xi belongs to S0
         if case == 1: 
-            Xj = (g * Xi) % p
+            Xj = point_add(Xi, P, a, p)
             aj = (ai + 1) % q
             bj = bi 
         #Xi belongs to S1
         elif case == 2:
-            Xj = pow(Xi, 2, p)
+            Xj = point_double(Xi, a, p)
             aj = (2*ai) % q
             bj = (2*bi) % q
         #Xi belongs to S2
         else:
-            Xj = (Xi *y) % p
+            Xj = point_add(Xi, Y, a, p)
             aj = ai
             bj = (bi + 1) % q
         return (Xj, aj, bj)
 
     i = 0
     #Slow "Tortoise"
-    T, alpha, beta = (1, 0, 0)
+    T, alpha, beta = (P, 1, 0)
     #Fast "Hare"
-    H, gamma, delta = (1, 0, 0)
+    H, gamma, delta = (P, 1, 0)
 
     while True:
         i += 1
@@ -86,87 +61,80 @@ def pollard_rho(g, p, q, y):
         T, alpha, beta = f_mapping(T, alpha, beta)
         H, gamma, delta = f_mapping(*f_mapping(H, gamma, delta))
 
-        if (T == H % p): 
-            #Now T = H, so a + xb = g + xd mod p_t
+        #print(f"T: {T}, H: {H}")
+        if (T == H): 
+            #Now T = H, so aP + bQ = gP + dQ = -(a-g)/(d-b)P = Q
             if  beta != delta % q:
-                x = (alpha-gamma)*pow(delta - beta, -1, q) % q
-                return (x, i)
+                print(alpha, gamma, delta, beta)
+                s = (alpha-gamma)*pow(delta - beta, -1, q) % q
+                return (s, i)
             else:
                 alpha = randrange(0, q)
                 beta = randrange(0, q)
-                T = (pow(g, alpha, p) * pow(y, beta, p)) % p
+                T = point_add(fast_multiply(P, alpha, a, p), fast_multiply(Y, beta, a, p)) 
                 H, gamma, delta = (T, alpha, beta)
                 print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {alpha}, beta = {beta}, T = {T}")
 
 """
 Genearate an instance of an DL problem
 """
-def generate_DLP_instance(min_p, max_p, p, p_t, g, g_t , real_x, y, r):
+def generate_DLP_instance(n_bits, real_s, Y):
     try:
-        #Generate primes p and p_t
-        if not (p and p_t):
-            p, p_t = gen_strong_prime(min_p, max_p, not r, p, p_t)
-        assert (isprime(p) and isprime(p_t) and p == 2*p_t + 1), "p or p_t are not primes or p != 2*p_t + 1, use different values"
-        assert (p_t >= 2), "p_t ust be greater than 2, use a different value"
+        #Get pregenerated EC
+        assert n_bits in EC, f"There is no pre-generated {n_bits} bits long EC, use a different value"
+        ec = EC[n_bits]
 
-        #Generate g and g_t
-        if not (g_t):
-            g, g_t = gen_g(p, g=g)
-        assert (pow(g_t, p_t, p) == 1), "Order of g_t should be equal to p_t, use different value"
+        #Generate Y
+        if not (Y):
+            real_s, Y = gen_Y_ec(ec.basepoint, ec.order, ec.a, ec.field_size, real_s)
+        elif real_s:
+            assert (fast_multiply(P, real_s, ec.field_size) == Y), "P*s mod p != y, use correct x value"
 
-        #Generate y
-        if not (y):
-            real_x, y = gen_y(g_t, p_t, p, real_x)
-        elif real_x:
-            assert (pow(g_t, real_x, p) == y), "g_t^x mod p != y, use correct x value"
+        return (ec, real_s, Y)
 
-        return (p, p_t, g, g_t, real_x, y)
-
-    except AssertionError as ex:
+    except Exception as ex:
         raise Exception(f"Generating DLP failed, reason: \n{ex.args[0]}")
 
-def main(min = None, max = None, p= None, p_t = None, g = None, g_t = None, real_x = None, y = None, r= None):
+def main(n_bits = None, real_s = None, Y = None):
     try:
-        nmin = 40 if not min else min
-        max = 61 if not (max or min) else min + 1 if max==None else max + 1
-        min = nmin
+        #init params
+        n_bits = 40 if not n_bits else n_bits
+        ec, real_s, Y = generate_DLP_instance(n_bits, real_s, Y)
 
-        p, p_t, g, g_t, real_x, y = generate_DLP_instance(min, max, p, p_t, g, g_t, real_x, y, r)
+        print(f'p is a {ec.field_size.bit_length()} bit number')
+        print(f'EC: {str(ec)}')
+        print(f"Real s = {real_s}, \nY = {ec.basepoint}*{real_s} mod {ec.field_size} = {Y}") if real_s else print(f"Y = {ec.basepoint}*s mod {ec.field_size} = {Y}")
+        print(f'Estimated maximum iterations order of magnitude sqrt(q) = {round(pow(ec.order, 0.5)):,}')
 
-        print(f'p is a {p.bit_length()} bit number')
-        print("p = %s, p_t = %s" % (p, p_t))
-        print("g = %s, g_t = %s" % (g , g_t)) if g else print("g_t = %s" % (g_t)) 
-        print(f"Check order of g_t: {g_t}^{p_t} mod {p} = {(pow(g_t, p_t, p))}" )
-        print(f"Real x = {real_x}, \ny = {g_t}^{real_x} mod {p} = {y}") if real_x else print(f"y = {g_t}^x mod {p} = {y}")
-        print(f'Estimated maximum iterations order of magnitude sqrt(p_t) = {round(pow(p_t, 0.5)):,}')
-
+        #Pollard-rho calculations + time checking
         start_time = time.time()
-        calc_x, i = pollard_rho(g_t, p, p_t, y)
+        calc_s, i = pollard_rho(Y, ec.basepoint, ec.order, ec.field_size, ec.a, ec.b)
         calc_time = time.time() - start_time
         
         print(f'Calcutaion time: {round(calc_time, 1)} seconds')
         print(f"Iterations: {i:,}")
-        print(f"Real x = {real_x}, calculated x = {calc_x}") if real_x else print(f"Calculated x = {calc_x}")
-
-        if pow(g_t, calc_x, p) == y:
-            print(f"Calculations correct, {g_t}^{calc_x} mod {p} = {y}")
+        print(f"Real s = {real_s}, calculated s = {calc_s}") if real_s else print(f"Calculated s = {calc_s}")
+    
+        #Check if real s and calc s are the same
+        if fast_multiply(ec.basepoint, calc_s, ec.a, ec.field_size) == Y:
+            print(f"Calculations correct, {ec.basepoint}*{calc_s} mod {ec.field_size} = {Y}")
         else:
-            print(f"Calculations failed,  {g_t}^{calc_x} mod {p} != {y}. y might not be in <g>")
+            print(f"Calculations failed,  {ec.basepoint}*{calc_s} mod {ec.field_size} = {Y}")
     except Exception as ex:
         print(ex.args[0])
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser(description='Polland-rho alghorhitm for DL problems in finite fields.')
-    parser.add_argument("--min", type=int)
-    parser.add_argument("--max", type=int)
-    parser.add_argument("-p", type=int)
-    parser.add_argument("-pt", type=int)
-    parser.add_argument("-g", type=int)
-    parser.add_argument("-gt", type=int)
-    parser.add_argument("-x", type=int)
-    parser.add_argument("-y", type=int)
-    parser.add_argument("-r", action='store', nargs='*')
+    parser = argparse.ArgumentParser(description='Polland-rho alghorhitm for DL problems over Eliptic Curve.')
+    parser.add_argument("-n", type=int)
+    parser.add_argument("-y", nargs='+',type=int)
+    parser.add_argument("-s", type=int)
     a = parser.parse_args()
-    r = True if a.r is not None else False
+    if a.y != None:
+        y = tuple(a.y)
+    else:
+        y = a.y
 
-    main(a.min, a.max, a.p, a.pt, a.g, a.gt, a.x, a.y, r)
+    #print(fast_multiply(7, 8))
+    #print(fast_multiply(EC[40].basepoint, 16, EC[40].a ))
+
+    main(a.n, a.s, y)
