@@ -1,7 +1,7 @@
 #!/bin/python
 #for prime generation
 from sympy import randprime, isprime, nextprime
-from ec_gen import point_double, point_add, EC, EcPoint
+from ec_gen import EC, EcPointAffine, ElCurve, EcPoint
 #misc
 import argparse
 from termcolor import colored
@@ -9,43 +9,30 @@ from random import randrange
 import time
 
 
-"""
-double-and-add algorithm for fast multiplication
-"""
-def fast_multiply(P: tuple, s: int, a: int, p: int) -> tuple:
-    b_bin = format(s, "b")
-    
-    R = P
-    for bit in b_bin[1:]:
-        R = point_double(R, a, p)
-        if bit == "1":
-            R = point_add(R, P, a, p)
-    return R
-
-def gen_Y_ec(P, q, a, p, real_x = None):
+def gen_Y_ec(P, q, real_x = None):
     s = randrange(2, q - 1) if not real_x else real_x
-    Y = fast_multiply(P, s, a, p)
+    Y = P * s
     return (s, Y)
 
 """
 Pollard-rho algorithm for DL problems
 """
-def pollard_rho(Y, P, q, p, a, b):
+def pollard_rho(Y, P, q):
     def f_mapping(Xi, ai, bi):
         case = Xi.x % 3
         #Xi belongs to S0
         if case == 1: 
-            Xj = point_add(Xi, P, a, p)
+            Xj = Xi + P
             aj = (ai + 1) % q
             bj = bi 
         #Xi belongs to S1
         elif case == 2:
-            Xj = point_double(Xi, a, p)
+            Xj = Xi + Xi
             aj = (2*ai) % q
             bj = (2*bi) % q
         #Xi belongs to S2
         else:
-            Xj = point_add(Xi, Y, a, p)
+            Xj = Xi + Y
             aj = ai
             bj = (bi + 1) % q
         return (Xj, aj, bj)
@@ -72,7 +59,7 @@ def pollard_rho(Y, P, q, p, a, b):
             else:
                 alpha = randrange(0, q)
                 beta = randrange(0, q)
-                T = point_add(fast_multiply(P, alpha, a, p), fast_multiply(Y, beta, a, p)) 
+                T = (P * alpha) + (Y * beta) 
                 H, gamma, delta = (T, alpha, beta)
                 print(f"Algorithm unsuccessful - d == b\nStarting pollard-rho again with alpha = {alpha}, beta = {beta}, T = {T}")
 
@@ -84,12 +71,11 @@ def generate_DLP_instance(n_bits, real_s, Y):
         #Get pregenerated EC
         assert n_bits in EC, f"There is no pre-generated {n_bits} bits long EC, use a different value"
         ec = EC[n_bits]
-
         #Generate Y
         if not (Y):
-            real_s, Y = gen_Y_ec(ec.basepoint, ec.order, ec.a, ec.field_size, real_s)
+            real_s, Y = gen_Y_ec(ec.basepoint_affine, ec.order, real_s)
         elif real_s:
-            assert (fast_multiply(P, real_s, ec.field_size) == Y), "P*s mod p != y, use correct x value"
+            assert (P * real_s == Y), "P*s mod p != y, use correct x value"
 
         return (ec, real_s, Y)
 
@@ -116,7 +102,7 @@ def main(n_bits = None, real_s = None, Y = None):
         print(f"Starting pollard-rho(Y, P, q, p, a, b) = ")
         print(f"Pollard-Rho({colored(Y, 'blue')}, {colored(ec.basepoint, 'green')}, {colored(ec.order, 'cyan')}, {colored(ec.field_size, 'yellow')}, {colored(ec.a, 'white')}, {colored(ec.b, 'white')})")
         start_time = time.time()
-        calc_s, i = pollard_rho(Y, ec.basepoint, ec.order, ec.field_size, ec.a, ec.b)
+        calc_s, i = pollard_rho(Y, ec.basepoint_affine, ec.order)
         calc_time = time.time() - start_time
         print(f'Calculation time: {round(calc_time, 1)} seconds')
         print(f"Iterations: {i:,}")
@@ -124,7 +110,7 @@ def main(n_bits = None, real_s = None, Y = None):
     
 
         #Check if real s and calc s are the same
-        if fast_multiply(ec.basepoint, calc_s, ec.a, ec.field_size) == Y:
+        if (ec.basepoint_affine * calc_s) == Y:
             print(f"{colored(ec.basepoint, 'green')}*{colored(calc_s, 'red')} mod {colored(ec.field_size, 'yellow')} = {colored(Y, 'blue')}")
             print(f"{colored('Calculations correct!', 'green')}")
         else:
@@ -140,8 +126,8 @@ if __name__=="__main__":
     parser.add_argument("-s", type=int)
     a = parser.parse_args()
     if a.y != None:
-        assert len(a.y) == 2, "Supply exactly 2 coordinates for Y"
-        y = EcPoint(a.y[0], a.y[1])
+        assert len(a.y) >= 2, "Supply at least 2 coordinates for Y"
+        y = EcPointAffine(a.y[0], a.y[1], 1) if len(a.y) <3 else EcPoint(a.y[0], a.y[1], a.y[2]) 
     else:
         y = a.y
 
