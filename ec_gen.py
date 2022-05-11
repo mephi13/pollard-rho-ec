@@ -84,7 +84,7 @@ class EcPointAffine(EcPoint):
 
         #if they are equal, double
         if (Q == P):
-            return self._point_double(P)
+            return self.point_double(P)
 
         #if p == -q return point in infinity
         if (P == -Q):
@@ -102,7 +102,7 @@ class EcPointAffine(EcPoint):
         return EcPointAffine(x, y, self.z, self.ec, self.inf)
 
 
-    def _point_double(self, P):
+    def point_double(self, P):
         a = self.ec.a if self.ec else 0
         p = self.ec.field_size if self.ec else None
         #return point at infinity
@@ -128,8 +128,19 @@ class EcPointProjective(EcPoint):
         self.y = 1
         self.z = 0 
 
+    def __eq__(self, other):
+        # two points are equal if they're scalar multiplications of another 
+        p = self.ec.field_size
+
+        u1 = (self.x * other.z) % p
+        u2 = (other.x * self.z) % p
+        s1 = (self.y * other.z) % p
+        s2 = (other.y * self.z) % p
+
+        return (s1 == s2 and u1 == u2)
+
     def __neg__(self):
-        return EcPointProjective(self.x, -self.y, self.z, self.ec) if not self.inf else self
+        return EcPointProjective(self.x, -self.y % self.ec.field_size, self.z, self.ec) if not self.inf else self
 
     def __add__(self, other):
         return self._point_add(self, other)
@@ -153,47 +164,44 @@ class EcPointProjective(EcPoint):
             return P
 
         #assign u1,u2,s1,s2
-        u1 = P.x * Q.z
-        u2 = Q.x * P.z
-        s1 = P.y * Q.z
-        s2 = Q.y * P.z
+        u1 = (P.x * Q.z) % p
+        u2 = (Q.x * P.z) % p
+        s1 = (P.y * Q.z) % p
+        s2 = (Q.y * P.z) % p
 
         #if they are equal, double
         if ( (s1 == s2) and (u1 == u2) ):
-            return self._point_double(P)
-
-        #if p == -q return point in infinity
-        #if (P == -Q):
-        #    return EcPointAffine(0, 1, 0, inf=True)
+            return self.point_double(P)
 
         #assign RR and PP
-        PP = u2 - u1
-        RR = s2 - s1
+        PP = (u2 - u1) 
+        RR = (s2 - s1) 
 
-        #calculate alpha == RR/PP
-        alpha = (RR * pow(PP, -1, p)) % p
-        
         #assign w
         w = P.z * Q.z
 
-        x = PP * (w * pow(RR, 2 ,p) - (u1 + u2) * pow(PP, 2, p))
-        y = RR * (-2 * w * pow(RR, 2, p) +3 * (u1 + u2) * pow(PP,2,p)) - (s1 + s2) * pow(PP, 3, p)
+        # calculate all squares
+        P_sq = pow(PP, 2, p)
+        R_sq = pow(RR, 2, p)
+
+        # calcuate all multiplications
+        P3_mul = (P_sq * PP) % p
+        w_R2_mul = (w * R_sq) % p
+        U12_P2_mul = ((u1 + u2) * P_sq) % p 
+
+        z = (P3_mul * w) % p
+        x = (PP * (w_R2_mul - U12_P2_mul)) % p
+        y = (RR * (-2 * w_R2_mul + 3 * U12_P2_mul) - (s1 + s2) * P3_mul) % p
 
         if y % 2 == 1:
             y += p
         
         y = y//2
 
-        z = pow(PP, 3, p) * w
-
-        x = x % p
-        y = y % p
-        z = z % p
-
         return EcPointProjective(x, y, z, self.ec)
 
 
-    def _point_double(self, P):
+    def point_double(self, P):
         a = self.ec.a if self.ec else 0
         p = self.ec.field_size if self.ec else None
         #return point at infinity
@@ -210,11 +218,12 @@ class EcPointProjective(EcPoint):
         alpha = (w * pow(s, -1, p)) % p
 
         # assign B and h
-        B = (2 * s * P.x * P.y) % p
+        s_y_mul = (s * P.y) % p
+        B = (2 * P.x * s_y_mul) % p
         h = (pow(w, 2, p) - 2 * B) % p
 
         x = (h * s) % p
-        y = (w * (B-h) - 2 * pow(s*P.y, 2, p)) % p
+        y = (w * (B-h) - 2 * pow(s_y_mul, 2, p)) % p
         z = (pow(s, 3, p))
 
         return EcPointProjective(x, y, z, self.ec)
@@ -254,7 +263,7 @@ EC = {
 
 if __name__ == "__main__":
     seed(time.time())
-    ec = EC[6]
+    ec = EC[41]
 
     ec.basepoint = EcPointAffine(ec.basepoint.x, ec.basepoint.y, ec.basepoint.z, ec.basepoint.ec, False)
 
@@ -295,6 +304,22 @@ if __name__ == "__main__":
     print(ec.basepoint * 2)
     print(ec.basepoint * 3)
     print((point + point) * 2)
-    assert (point + point) + (point + point) == point * 4, "Assertion error, (P + P) + (P + P) != 4P"
+    print((point + point)
+)
+
+    test0 = (point + (point * 2))
+    test01 = (point + point + point)
+
+    assert not point * 3 == point + point, "Assertion error, (P * 3) = (P + P)"
+    assert (point + (point)) + (point + point + point) == point * 5, "Assertion error, (P + P) + (P + P + P) != 5P"
     assert (point + point) + (point + point) == point * 2 + point * 2, "Assertion error, (P + P) + (P + P) != 2P + 2P"
+    
+    test1 = point * 2 + point * 3
+    test2 = (point * 2) * 2 + point
+
+    point = EcPointProjective(10, 11, 12, ec)
+    print(point)
+    print(EcPointProjective(3*point.x, 3*point.y, 3*point.z, ec))
+    print(EcPointProjective(2*point.x, 2*point.y, 2*point.z, ec))
+    print(EcPointProjective(2*point.x, 2*point.y, 2*point.z, ec) == EcPointProjective(3*point.x, 3*point.y, 3*point.z, ec))
     assert point * 2 + point * 3 == (point * 2) * 2 + point, "Assertion error, P*2 + P*3 != (P*2)*2 + 1"
