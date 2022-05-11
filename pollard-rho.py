@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/env python
 #for prime generation
 from sympy import randprime, isprime, nextprime
 from ec_gen import EC, EcPointAffine, ElCurve, EcPoint, EcPointProjective
